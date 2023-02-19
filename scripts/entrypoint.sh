@@ -82,10 +82,16 @@ export JAVA_OPTS="${JAVA_OPTS} ${GEOSERVER_OPTS}"
 
 
 # Chown again - seems to fix issue with resolving all created directories
+#chown -R "${USER_NAME}":"${GEO_GROUP_NAME}" "${CATALINA_HOME}" "${FOOTPRINTS_DATA_DIR}" "${GEOSERVER_DATA_DIR}" \
+#"${CERT_DIR}" "${FONTS_DIR}"  /home/"${USER_NAME}"/ "${COMMUNITY_PLUGINS_DIR}" "${STABLE_PLUGINS_DIR}" \
+#"${GEOSERVER_HOME}" "${EXTRA_CONFIG_DIR}"  /usr/share/fonts/ /scripts /tomcat_apps.zip \
+#/tmp/ "${GEOWEBCACHE_CACHE_DIR}";chmod o+rw "${CERT_DIR}";chmod 400 ${CATALINA_HOME}/conf/*
+
 chown -R "${USER_NAME}":"${GEO_GROUP_NAME}" "${CATALINA_HOME}" "${FOOTPRINTS_DATA_DIR}" "${GEOSERVER_DATA_DIR}" \
 "${CERT_DIR}" "${FONTS_DIR}"  /home/"${USER_NAME}"/ "${COMMUNITY_PLUGINS_DIR}" "${STABLE_PLUGINS_DIR}" \
 "${GEOSERVER_HOME}" "${EXTRA_CONFIG_DIR}"  /usr/share/fonts/ /scripts /tomcat_apps.zip \
-/tmp/ "${GEOWEBCACHE_CACHE_DIR}";chmod o+rw "${CERT_DIR}";chmod 400 ${CATALINA_HOME}/conf/*
+/tmp/;chmod o+rw "${CERT_DIR}";chmod 400 ${CATALINA_HOME}/conf/*
+
 
 if [[ -f ${GEOSERVER_HOME}/start.jar ]]; then
   exec gosu ${USER_NAME} ${GEOSERVER_HOME}/bin/startup.sh

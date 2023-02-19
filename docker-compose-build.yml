@@ -7,7 +7,7 @@ volumes:
 services:
 
    geoserver:
-      image: kartoza/geoserver:${GS_VERSION}
+      image: kartoza/geoserver-mod:${GS_VERSION}
       build:
         context: .
         args:
