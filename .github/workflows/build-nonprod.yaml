@@ -1,0 +1,40 @@
+name: Geoserver base image - deploy (auto)
+on:
+  push:
+    branches:
+      - develop
+
+env:
+  ECR_REGION: ca-central-1
+
+jobs:
+  build:
+    name: Building Docker Image on runner
+    runs-on: [self-hosted, linux, x64, geocentralis-dev]
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-region: ${{ env.ECR_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+      with:
+        registry-type: private
+
+    - name: Build and push the image
+      id: Build-Docker-Image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: internal-images
+        IMAGE_TAG: ${{ github.run_number}}
+
+      run: |
+        docker-compose -f docker-compose-build.yml build
+        source .env && docker tag kartoza/geoserver-mod:$GS_VERSION $ECR_REGISTRY/$ECR_REPOSITORY:kartoza/geoserver-mod:$GS_VERSION
+        source .env && docker push $ECR_REGISTRY/$ECR_REPOSITORY:kartoza/geoserver-mod:$GS_VERSION
