@@ -35,6 +35,7 @@ jobs:
         ECR_REPOSITORY: internal-images
 
       run: |
-        docker-compose -f docker-compose-build.yml build
-        # source .env && docker tag kartoza/geoserver-mod:$GS_VERSION $ECR_REGISTRY/$ECR_REPOSITORY:kartoza/geoserver-mod:$GS_VERSION
-        # source .env && docker push $ECR_REGISTRY/$ECR_REPOSITORY:kartoza/geoserver-mod:$GS_VERSION
+        docker-compose -f docker-compose-build.yml build        
+        source .env && docker tag kartoza/geoserver-mod:$GS_VERSION $ECR_REGISTRY/$ECR_REPOSITORY:kartoza-geoserver-mod_$GS_VERSION
+        source .env && docker push $ECR_REGISTRY/$ECR_REPOSITORY:kartoza-geoserver-mod_$GS_VERSION
+        
