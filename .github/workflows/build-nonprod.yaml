@@ -1,4 +1,5 @@
 name: Geoserver base image - deploy (auto)
+
 on:
   push:
     branches:
@@ -12,7 +13,6 @@ jobs:
     name: Building Docker Image on runner
     runs-on: [self-hosted, linux, x64, geocentralis-dev]
     steps:
-
     - name: Check out code
       uses: actions/checkout@v3
 
@@ -32,7 +32,6 @@ jobs:
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: internal-images
-        IMAGE_TAG: ${{ github.run_number}}
 
       run: |
         docker-compose -f docker-compose-build.yml build
