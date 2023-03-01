@@ -73,10 +73,16 @@ fi
 pushd ${resources_dir}/plugins || exit
 
 array=(geoserver-${GS_VERSION}-vectortiles-plugin.zip geoserver-${GS_VERSION}-wps-plugin.zip geoserver-${GS_VERSION}-printing-plugin.zip
-  geoserver-${GS_VERSION}-libjpeg-turbo-plugin.zip geoserver-${GS_VERSION}-control-flow-plugin.zip
+  geoserver-${GS_VERSION}-control-flow-plugin.zip
   geoserver-${GS_VERSION}-pyramid-plugin.zip geoserver-${GS_VERSION}-gdal-plugin.zip
   geoserver-${GS_VERSION}-monitor-plugin.zip geoserver-${GS_VERSION}-inspire-plugin.zip
   geoserver-${GS_VERSION}-csw-plugin.zip geoserver-${GS_VERSION}-csw-iso-plugin.zip)
+
+#array=(geoserver-${GS_VERSION}-vectortiles-plugin.zip geoserver-${GS_VERSION}-wps-plugin.zip geoserver-${GS_VERSION}-printing-plugin.zip
+#  geoserver-${GS_VERSION}-libjpeg-turbo-plugin.zip geoserver-${GS_VERSION}-control-flow-plugin.zip
+#  geoserver-${GS_VERSION}-pyramid-plugin.zip geoserver-${GS_VERSION}-gdal-plugin.zip
+#  geoserver-${GS_VERSION}-monitor-plugin.zip geoserver-${GS_VERSION}-inspire-plugin.zip
+#  geoserver-${GS_VERSION}-csw-plugin.zip geoserver-${GS_VERSION}-csw-iso-plugin.zip)
 for i in "${array[@]}"; do
   url="${STABLE_PLUGIN_BASE_URL}/${GS_VERSION}/extensions/${i}"
   download_extension "${url}" "${i%.*}" ${resources_dir}/plugins
@@ -84,15 +90,15 @@ done
 
 
 # Install libjpeg-turbo
-system_architecture=$(dpkg --print-architecture)
-if [[ ! -f ${resources_dir}/libjpeg-turbo-official_2.1.3_amd64.deb ]]; then
-  validate_url https://tenet.dl.sourceforge.net/project/libjpeg-turbo/2.1.4/libjpeg-turbo-official_2.1.4_${system_architecture}.deb \
-    '-P /tmp/resources/'
-fi
-
-dpkg -i ${resources_dir}/libjpeg-turbo-official_2.1.4_${system_architecture}.deb
-
-pushd "${CATALINA_HOME}" || exit
+#system_architecture=$(dpkg --print-architecture)
+#if [[ ! -f ${resources_dir}/libjpeg-turbo-official_2.1.3_amd64.deb ]]; then
+#  validate_url https://tenet.dl.sourceforge.net/project/libjpeg-turbo/2.1.4/libjpeg-turbo-official_2.1.4_${system_architecture}.deb \
+#    '-P /tmp/resources/'
+#fi
+#
+#dpkg -i ${resources_dir}/libjpeg-turbo-official_2.1.4_${system_architecture}.deb
+#
+#pushd "${CATALINA_HOME}" || exit
 
 # Install GeoServer plugins in correct install dir
 if [[ -f ${GEOSERVER_HOME}/start.jar ]]; then
