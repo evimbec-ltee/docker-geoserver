@@ -1,4 +1,4 @@
-name: Geoserver base image - deploy (auto)
+name: Geoserver base image NONPROD - deploy (auto)
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    if: ${{ false }}  # disable for now
+    # if: ${{ false }}  # disable for now
     name: Building Docker Image on runner
     runs-on: [self-hosted, linux, x64, geocentralis-dev]
     steps:

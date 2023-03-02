@@ -1,4 +1,4 @@
-name: Geoserver base image - deploy (auto)
+name: Geoserver base image PROD - deploy (auto)
 
 on:
   push:
