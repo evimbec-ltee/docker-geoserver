@@ -12,7 +12,7 @@ jobs:
   build:
     if: ${{ false }}  # disable for now
     name: Building Docker Image on runner
-    runs-on: [self-hosted, linux, x64, geocentralis-dev]
+    runs-on: [self-hosted, linux, x64, geocentralis-prod]
     steps:
     - name: Check out code
       uses: actions/checkout@v3
