@@ -61,4 +61,5 @@ RUN echo 'figlet -t "Kartoza Docker GeoServer"' >> ~/.bashrc
 
 WORKDIR ${GEOSERVER_HOME}
 
-ENTRYPOINT ["/bin/bash", "/scripts/entrypoint.sh"]
+# ENTRYPOINT ["/bin/bash", "/scripts/entrypoint.sh"]
+CMD ["/bin/bash", "/scripts/entrypoint.sh"]
