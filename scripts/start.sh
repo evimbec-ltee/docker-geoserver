@@ -425,20 +425,14 @@ transform="xsltproc \
   ${SSL_CONF} \
   ${CATALINA_HOME}/conf/server.xml"
 
-if [[ -d ${GEOSERVER_HOME} ]]; then
-  echo "folder ${GEOSERVER_HOME} exists"
-else
-  echo "folder ${GEOSERVER_HOME} does not exist"
-fi
 
 if [[ -f ${EXTRA_CONFIG_DIR}/server.xml ]]; then
-  cp -f "${EXTRA_CONFIG_DIR}"/server.xml "${CATALINA_HOME}"/conf/server.xml.extraconfdir
   cp -f "${EXTRA_CONFIG_DIR}"/server.xml "${CATALINA_HOME}"/conf/
 else
   # default value
-  cp -f ${CATALINA_HOME}/conf/server.xml "${CATALINA_HOME}"/conf/server.xml.org
   eval "$transform"
 fi
+
 
 # Cleanup temp file
 delete_file ${CATALINA_HOME}/conf/ssl-tomcat_no_https.xsl
