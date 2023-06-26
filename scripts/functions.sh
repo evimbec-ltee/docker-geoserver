@@ -13,6 +13,7 @@ function validate_url(){
     EXTRA_PARAMS=$2
   fi
   if [[ `wget -S --spider $1  2>&1 | grep 'HTTP/1.1 200 OK'` ]]; then
+    echo "executing: ${request} $1 $2"
     ${request} $1 $2
   else
     echo -e "URL : \e[1;31m $1 does not exists \033[0m"
