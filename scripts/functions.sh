@@ -214,6 +214,7 @@ function broker_config() {
 }
 
 function broker_xml_config() {
+  mkdir -p "${CLUSTER_CONFIG_DIR}"
   if [[ ! -f ${CLUSTER_CONFIG_DIR}/broker.xml ]]; then
     # If it doesn't exists, copy from /settings directory if exists
     if [[ -f ${EXTRA_CONFIG_DIR}/broker.xml ]]; then
