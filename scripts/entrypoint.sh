@@ -62,7 +62,7 @@ export GEOSERVER_OPTS="-Djava.awt.headless=true -server -Xms${INITIAL_MEMORY} -X
        -DGEOSERVER_DATA_DIR=${GEOSERVER_DATA_DIR} \
        -DGEOSERVER_FILEBROWSER_HIDEFS=${GEOSERVER_FILEBROWSER_HIDEFS} \
        -DGEOSERVER_AUDIT_PATH=${MONITOR_AUDIT_PATH} \
-       -Dorg.geotools.shapefile.datetime=${USE_DATETIME_IN_SHAPEFILE} \
+       -Dorg.geotools.shapefile.datetime=${USE_DAT.ETIME_IN_SHAPEFILE} \
        -Dorg.geotools.localDateTimeHandling=true \
        -Dsun.java2d.renderer.useThreadLocal=false \
        -Dsun.java2d.renderer.pixelsize=8192 -server -XX:NewSize=300m \
