@@ -1,23 +1,10 @@
-version: '3'
-
+version: '3.9'
 volumes:
    geoserver-data:
    settings:
-
 services:
-
-   geoserver:
+   geoserver-prod:
       image: kartoza/geoserver-mod:${GS_VERSION}
-      build:
-        context: .
-        args:
-          IMAGE_VERSION: ${IMAGE_VERSION}
-          JAVA_HOME: ${JAVA_HOME}
-          GS_VERSION: ${GS_VERSION}
-          WAR_URL: ${WAR_URL}
-          DOWNLOAD_ALL_STABLE_EXTENSIONS: ${DOWNLOAD_ALL_STABLE_EXTENSIONS}
-          DOWNLOAD_ALL_COMMUNITY_EXTENSIONS: ${DOWNLOAD_ALL_COMMUNITY_EXTENSIONS}
-          STABLE_PLUGIN_BASE_URL: ${STABLE_PLUGIN_BASE_URL}
       volumes:
         - geoserver-data:/opt/geoserver/data_dir
         - settings:/settings
@@ -41,6 +28,23 @@ services:
         interval: 1m
         timeout: 10s
         retries: 3
+      build:
+        context: .
+        # Use yaml anchor for reusability
+        args: &build-args-anchor
+          IMAGE_VERSION: ${IMAGE_VERSION}
+          JAVA_HOME: ${JAVA_HOME}
+          GS_VERSION: ${GS_VERSION}
+          WAR_URL: ${WAR_URL}
+          DOWNLOAD_ALL_STABLE_EXTENSIONS: ${DOWNLOAD_ALL_STABLE_EXTENSIONS}
+          DOWNLOAD_ALL_COMMUNITY_EXTENSIONS: ${DOWNLOAD_ALL_COMMUNITY_EXTENSIONS}
+          STABLE_PLUGIN_BASE_URL: ${STABLE_PLUGIN_BASE_URL}
+        target: geoserver-prod
 
-
-
+  geoserver-test:
+    image: kartoza/geoserver-mod:manual-build
+    build:
+      context: .
+      args:
+        <<: *build-args-anchor
+      target: geoserver-test

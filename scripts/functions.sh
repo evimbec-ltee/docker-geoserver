@@ -59,15 +59,22 @@ function delete_folder() {
 # Function to add custom crs in geoserver data directory
 # https://docs.geoserver.org/latest/en/user/configuration/crshandling/customcrs.html
 function setup_custom_crs() {
-  if [[ ! -f ${GEOSERVER_DATA_DIR}/user_projections/epsg.properties ]]; then
-    # If it doesn't exists, copy from ${EXTRA_CONFIG_DIR} directory if exists
+    # If it exists, copy from ${EXTRA_CONFIG_DIR} directory if exists
     if [[ -f ${EXTRA_CONFIG_DIR}/epsg.properties ]]; then
-      cp -f "${EXTRA_CONFIG_DIR}"/epsg.properties "${GEOSERVER_DATA_DIR}"/user_projections/
+       cp -f "${EXTRA_CONFIG_DIR}"/epsg.properties "${GEOSERVER_DATA_DIR}"/user_projections/
     else
       # default values
-      cp -r "${CATALINA_HOME}"/data/user_projections/epsg.properties "${GEOSERVER_DATA_DIR}"/user_projections/epsg.properties
+      if [[ ! -f ${GEOSERVER_DATA_DIR}/user_projections/epsg.properties ]]; then
+        cp -r "${CATALINA_HOME}"/data/user_projections/epsg.properties "${GEOSERVER_DATA_DIR}"/user_projections/epsg.properties
+      fi
     fi
-  fi
+}
+
+function setup_custom_override_crs() {
+    # If it doesn't exists, copy from ${EXTRA_CONFIG_DIR} directory if exists
+    if [[ -f ${EXTRA_CONFIG_DIR}/epsg_overrides.properties ]]; then
+      cp -f "${EXTRA_CONFIG_DIR}"/epsg_overrides.properties"${GEOSERVER_DATA_DIR}"/user_projections/
+    fi
 }
 
 # Function to enable cors support thought tomcat
@@ -79,13 +86,21 @@ function web_cors() {
       cp -f "${EXTRA_CONFIG_DIR}"/web.xml  "${CATALINA_HOME}"/conf/
     else
       # default values
-      cp /build_data/web.xml "${CATALINA_HOME}"/conf/
+      envsubst < /build_data/web.xml > "${CATALINA_HOME}"/conf/web.xml
       ###
       # Deactivate CORS filter in web.xml if DISABLE_CORS=true
       # Useful if CORS is handled outside of Tomcat (e.g. in a proxying webserver like nginx)
       ###
       if [[ "${DISABLE_CORS}" =~ [Tt][Rr][Uu][Ee] ]]; then
         sed -i 's/<!-- CORS_START.*/<!-- CORS DEACTIVATED BY DISABLE_CORS -->\n<!--/; s/^.*<!-- CORS_END -->/-->/' \
+          ${CATALINA_HOME}/conf/web.xml
+      fi
+      ###
+      # Deactivate security filter in web.xml if DISABLE_SECURITY_FILTER=true
+      # https://github.com/kartoza/docker-geoserver/issues/549
+      ###
+      if [[ "${DISABLE_SECURITY_FILTER}" =~ [Tt][Rr][Uu][Ee] ]]; then
+        sed -i 's/<!-- SECURITY_START.*/<!-- SECURITY FILTER DEACTIVATED BY DISABLE_SECURITY_FILTER -->\n<!--/; s/^.*<!-- SECURITY_END -->/-->/' \
           ${CATALINA_HOME}/conf/web.xml
       fi
     fi
@@ -130,14 +145,22 @@ function validate_geo_install() {
 
 }
 
+function detect_install_dir() {
+  if [[ -f ${GEOSERVER_HOME}/start.jar ]]; then
+    echo "${GEOSERVER_HOME}"
+  else
+    echo "${CATALINA_HOME}"
+  fi
+}
+
 function unzip_geoserver() {
   if [[ -f /tmp/geoserver/geoserver.war ]]; then
-    unzip /tmp/geoserver/geoserver.war -d "${CATALINA_HOME}"/webapps/geoserver &&
-    validate_geo_install "${CATALINA_HOME}"/webapps/geoserver && \
-    cp -r "${CATALINA_HOME}"/webapps/geoserver/data "${CATALINA_HOME}" &&
-    mv "${CATALINA_HOME}"/data/security "${CATALINA_HOME}" &&
-    rm -rf "${CATALINA_HOME}"/webapps/geoserver/data &&
-    mv "${CATALINA_HOME}"/webapps/geoserver/WEB-INF/lib/postgresql-* "${CATALINA_HOME}"/postgres_config/ &&
+    unzip /tmp/geoserver/geoserver.war -d "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}
+    validate_geo_install "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}
+    cp -r "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}/data "${CATALINA_HOME}"
+    mv "${CATALINA_HOME}"/data/security "${CATALINA_HOME}"
+    rm -rf "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}/data
+    mv "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/postgresql-* "${CATALINA_HOME}"/postgres_config/
     rm -rf /tmp/geoserver
 else
     cp -r /tmp/geoserver/* "${GEOSERVER_HOME}"/ && \
@@ -155,20 +178,35 @@ if [[ ! -f /tmp/resources/geoserver-${GS_VERSION}.zip ]] || [[ ! -f /tmp/resourc
     if [[ "${WAR_URL}" == *\.zip ]]; then
       if [[ "${WAR_URL}" == *\bin.zip ]];then
         destination=/tmp/resources/geoserver-${GS_VERSION}-bin.zip
-        ${request} "${WAR_URL}" -O "${destination}"
+        if curl --output /dev/null --silent --head --fail "${WAR_URL}"; then
+          ${request} "${WAR_URL}" -O "${destination}"
+        else
+            echo -e "GeoServer war file does not exist from:: \e[1;31m ${WAR_URL} \033[0m"
+            exit 1
+        fi
         unzip /tmp/resources/geoserver-${GS_VERSION}-bin.zip -d /tmp/geoserver && \
         unzip_geoserver
       else
         destination=/tmp/resources/geoserver-${GS_VERSION}.zip
-        ${request} "${WAR_URL}" -O "${destination}"
+        if curl --output /dev/null --silent --head --fail "${WAR_URL}"; then
+          ${request} "${WAR_URL}" -O "${destination}"
+        else
+            echo -e "GeoServer war file does not exist from:: \e[1;31m ${WAR_URL} \033[0m"
+            exit 1
+        fi
         unzip /tmp/resources/geoserver-"${GS_VERSION}".zip -d /tmp/geoserver && \
         unzip_geoserver
       fi
     else
       destination=/tmp/geoserver/geoserver.war
       mkdir -p /tmp/geoserver/ &&
-      ${request} "${WAR_URL}" -O ${destination} && \
-      unzip_geoserver
+      if curl --output /dev/null --silent --head --fail "${WAR_URL}"; then
+          ${request} "${WAR_URL}" -O ${destination} && \
+          unzip_geoserver
+        else
+            echo -e "GeoServer war file does not exist from:: \e[1;31m ${WAR_URL} \033[0m"
+            exit 1
+      fi
     fi
 else
   if [[  -f /tmp/resources/geoserver-${GS_VERSION}.zip ]];then
@@ -232,6 +270,15 @@ function broker_xml_config() {
   fi
 }
 
+function s3_config() {
+  cat >"${GEOSERVER_DATA_DIR}"/s3.properties <<EOF
+alias.s3.endpoint=${S3_SERVER_URL}
+alias.s3.user=${S3_USERNAME}
+alias.s3.password=${S3_PASSWORD}
+EOF
+
+}
+
 # Helper function to configure s3 bucket
 # https://docs.geoserver.org/latest/en/user/community/s3-geotiff/index.html
 # Remove this based on https://www.mail-archive.com/geoserver-users@lists.sourceforge.net/msg34214.html
@@ -248,11 +295,8 @@ function install_plugin() {
   if [[ -f "${DATA_PATH}"/"${EXT}".zip ]];then
      unzip "${DATA_PATH}"/"${EXT}".zip -d /tmp/gs_plugin
      echo -e "\e[32m Enabling ${EXT} for GeoServer \033[0m"
-     if [[ -f /geoserver/start.jar ]]; then
-       cp -r -u -p /tmp/gs_plugin/*.jar /geoserver/webapps/geoserver/WEB-INF/lib/
-     else
-       cp -r -u -p /tmp/gs_plugin/*.jar "${CATALINA_HOME}"/webapps/geoserver/WEB-INF/lib/
-     fi
+     GEOSERVER_INSTALL_DIR="$(detect_install_dir)"
+     cp -r -u -p /tmp/gs_plugin/*.jar ${GEOSERVER_INSTALL_DIR}/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/
      rm -rf /tmp/gs_plugin
   else
     echo -e "\e[32m ${EXT} extension will not be installed because it is not available \033[0m"
@@ -278,7 +322,7 @@ function jdbc_disk_quota_config() {
   if [[ ! -f "${GEOWEBCACHE_CACHE_DIR}"/geowebcache-diskquota-jdbc.xml ]]; then
     # If it doesn't exists, copy from /settings directory if exists
     if [[ -f "${EXTRA_CONFIG_DIR}"/geowebcache-diskquota-jdbc.xml ]]; then
-      envsubst < "${EXTRA_CONFIG_DIR}"/geowebcache-diskquota-jdbc.xml < "${GEOWEBCACHE_CACHE_DIR}"/geowebcache-diskquota-jdbc.xml
+      envsubst < "${EXTRA_CONFIG_DIR}"/geowebcache-diskquota-jdbc.xml > "${GEOWEBCACHE_CACHE_DIR}"/geowebcache-diskquota-jdbc.xml
     else
       # default value
       envsubst < /build_data/geowebcache-diskquota-jdbc.xml > "${GEOWEBCACHE_CACHE_DIR}"/geowebcache-diskquota-jdbc.xml
@@ -289,14 +333,11 @@ function jdbc_disk_quota_config() {
 function activate_gwc_global_configs() {
   if [[ ! -f "${GEOSERVER_DATA_DIR}"/gwc-gs.xml ]]; then
     if [[ -f "${EXTRA_CONFIG_DIR}"/gwc-gs.xml ]]; then
-      envsubst < "${EXTRA_CONFIG_DIR}"/gwc-gs.xml < "${GEOSERVER_DATA_DIR}"/gwc-gs.xml
+      envsubst < "${EXTRA_CONFIG_DIR}"/gwc-gs.xml > "${GEOSERVER_DATA_DIR}"/gwc-gs.xml
     else
       # default value
       envsubst < /build_data/gwc-gs.xml > "${GEOSERVER_DATA_DIR}"/gwc-gs.xml
     fi
-  else
-      # default value
-      envsubst < /build_data/gwc-gs.xml > "${GEOSERVER_DATA_DIR}"/gwc-gs.xml
   fi
 }
 
@@ -329,7 +370,6 @@ function setup_logging() {
 
 function geoserver_logging() {
 
-  if [[ ! -f ${GEOSERVER_DATA_DIR}/logging.xml ]];then
     echo "
 <logging>
   <level>${GEOSERVER_LOG_LEVEL}</level>
@@ -338,19 +378,18 @@ function geoserver_logging() {
 </logging>
 " > "${GEOSERVER_DATA_DIR}"/logging.xml
 
-  fi
   if [[ ! -f ${GEOSERVER_DATA_DIR}/logs/geoserver.log ]];then
     touch "${GEOSERVER_DATA_DIR}"/logs/geoserver.log
   fi
 }
 
 # Function to read env variables from secrets
-function file_env {
+function file_env() {
 	local var="$1"
 	local fileVar="${var}_FILE"
-	local def="${1:-}"
+	local def="${2:-}"
 	if [ "${!var:-}" ] && [ "${!fileVar:-}" ]; then
-		echo >&2 "error: both $var and $fileVar are set (but are exclusive)"
+		printf >&2 'error: both %s and %s are set (but are exclusive)\n' "$var" "$fileVar"
 		exit 1
 	fi
 	local val="$def"
@@ -362,7 +401,6 @@ function file_env {
 	export "$var"="$val"
 	unset "$fileVar"
 }
-
 # Credits to https://github.com/korkin25 from https://github.com/kartoza/docker-geoserver/pull/371
 function set_vars() {
   if [ -z "${INSTANCE_STRING}" ];then
@@ -435,3 +473,35 @@ function create_gwc_tile_tables(){
 
 }
 
+function gwc_file_perms() {
+  GEO_USER_PERM=$(stat -c '%U' ${GEOSERVER_DATA_DIR})
+  GEO_GRP_PERM=$(stat -c '%G' ${GEOSERVER_DATA_DIR})
+  GWC_USER_PERM=$(stat -c '%U' ${GEOWEBCACHE_CACHE_DIR})
+  GWC_GRP_PERM=$(stat -c '%G' ${GEOWEBCACHE_CACHE_DIR})
+  case "${GEOWEBCACHE_CACHE_DIR}" in ${GEOSERVER_DATA_DIR}/*)
+    echo "${GEOWEBCACHE_CACHE_DIR} is nested in ${GEOSERVER_DATA_DIR}"
+    if [[ ${CHOWN_DATA_DIR} =~ [Tt][Rr][Uu][Ee] ]];then
+      if [[ ${GEO_USER_PERM} != "${USER_NAME}" ]] &&  [[ ${GEO_GRP_PERM} != "${GEO_GROUP_NAME}"  ]];then
+        echo -e "[Entrypoint] Changing folder permission for: \e[1;31m ${GEOSERVER_DATA_DIR} \033[0m"
+        chown -R "${USER_NAME}":"${GEO_GROUP_NAME}" ${GEOSERVER_DATA_DIR}
+      fi
+    fi
+    ;;
+  *)
+    echo "${GEOWEBCACHE_CACHE_DIR} is not nested in ${GEOSERVER_DATA_DIR}"
+    if [[ ${CHOWN_DATA_DIR} =~ [Tt][Rr][Uu][Ee] ]];then
+      if [[ ${GEO_USER_PERM} != "${USER_NAME}" ]] &&  [[ ${GEO_GRP_PERM} != "${GEO_GROUP_NAME}"  ]];then
+        echo -e "[Entrypoint] Changing folder permission for: \e[1;31m ${GEOSERVER_DATA_DIR} \033[0m"
+        chown -R "${USER_NAME}":"${GEO_GROUP_NAME}" ${GEOSERVER_DATA_DIR}
+      fi
+    fi
+    if [[ ${CHOWN_GWC_DATA_DIR} =~ [Tt][Rr][Uu][Ee] ]];then
+      if [[ ${GWC_USER_PERM} != "${USER_NAME}" ]] &&  [[ ${GWC_GRP_PERM} != "${GEO_GROUP_NAME}"  ]];then
+        echo -e "[Entrypoint] Changing folder permission for: \e[1;31m ${GEOWEBCACHE_CACHE_DIR} \033[0m"
+        chown -R "${USER_NAME}":"${GEO_GROUP_NAME}" ${GEOWEBCACHE_CACHE_DIR}
+      fi
+    fi
+   ;;
+esac
+
+}

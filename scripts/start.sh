@@ -3,6 +3,7 @@
 source /scripts/functions.sh
 source /scripts/env-data.sh
 GS_VERSION=$(cat /scripts/geoserver_version.txt)
+STABLE_PLUGIN_BASE_URL=$(cat /scripts/geoserver_gs_url.txt)
 
 web_cors
 
@@ -26,6 +27,7 @@ create_dir "${GEOSERVER_DATA_DIR}"/user_projections
 create_dir "${GEOWEBCACHE_CACHE_DIR}"
 
 setup_custom_crs
+setup_custom_override_crs
 
 create_dir "${GEOSERVER_DATA_DIR}"/logs
 export GEOSERVER_LOG_LEVEL
@@ -52,13 +54,16 @@ if [[  ${DB_BACKEND} =~ [Pp][Oo][Ss][Tt][Gg][Rr][Ee][Ss] ]]; then
   postgres_ssl_setup
   export DISK_QUOTA_BACKEND=JDBC
   export SSL_PARAMETERS=${PARAMS}
+  export POSTGRES_SCHEMA=${POSTGRES_SCHEMA}
   default_disk_quota_config
   jdbc_disk_quota_config
 
   echo -e "[Entrypoint] Checking PostgreSQL connection to see if diskquota tables are loaded: \033[0m"
-  export PGPASSWORD="${POSTGRES_PASS}"
-  postgres_ready_status ${HOST} ${POSTGRES_PORT} ${POSTGRES_USER} $POSTGRES_DB
-  create_gwc_tile_tables ${HOST} ${POSTGRES_PORT} ${POSTGRES_USER} $POSTGRES_DB $POSTGRES_SCHEMA
+  if [[  ${POSTGRES_SCHEMA} != 'public' ]]; then
+    export PGPASSWORD="${POSTGRES_PASS}"
+    postgres_ready_status ${HOST} ${POSTGRES_PORT} ${POSTGRES_USER} $POSTGRES_DB
+    create_gwc_tile_tables ${HOST} ${POSTGRES_PORT} ${POSTGRES_USER} $POSTGRES_DB $POSTGRES_SCHEMA
+  fi
 else
   export DISK_QUOTA_BACKEND=H2
   default_disk_quota_config
@@ -105,6 +110,8 @@ fi
 
 # Function to install community extensions
 export S3_SERVER_URL S3_USERNAME S3_PASSWORD
+# Pass an additional startup argument i.e -Ds3.properties.location=${GEOSERVER_DATA_DIR}/s3.properties
+s3_config
 
 
 # Install community modules plugins
@@ -200,9 +207,9 @@ if [[ ${POSTGRES_JNDI} =~ [Tt][Rr][Uu][Ee] ]];then
     POSTGRES_PORT=5432
     export POSTGRES_PORT="${POSTGRES_PORT}"
   fi
-  POSTGRES_JAR_COUNT=$(ls -1 ${CATALINA_HOME}/webapps/geoserver/WEB-INF/lib/postgresql-* 2>/dev/null | wc -l)
+  POSTGRES_JAR_COUNT=$(ls -1 ${CATALINA_HOME}/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/postgresql-* 2>/dev/null | wc -l)
   if [ "$POSTGRES_JAR_COUNT" != 0 ]; then
-    rm "${CATALINA_HOME}"/webapps/geoserver/WEB-INF/lib/postgresql-*
+    rm "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/postgresql-*
   fi
   cp "${CATALINA_HOME}"/postgres_config/postgresql-* "${CATALINA_HOME}"/lib/
   if [[ -f ${EXTRA_CONFIG_DIR}/context.xml  ]]; then
@@ -213,7 +220,7 @@ if [[ ${POSTGRES_JNDI} =~ [Tt][Rr][Uu][Ee] ]];then
   fi
 
 else
-  cp "${CATALINA_HOME}"/postgres_config/postgresql-* "${CATALINA_HOME}"/webapps/geoserver/WEB-INF/lib/
+  cp "${CATALINA_HOME}"/postgres_config/postgresql-* "${CATALINA_HOME}"/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/
 fi
 
 
@@ -232,7 +239,10 @@ if [[ "${TOMCAT_EXTRAS}" =~ [Tt][Rr][Uu][Ee] ]]; then
     if [[ -z ${TOMCAT_PASSWORD} ]]; then
         generate_random_string 18
         export TOMCAT_PASSWORD=${RAND}
-        echo -e "[Entrypoint] GENERATED tomcat  PASSWORD: \e[1;31m $TOMCAT_PASSWORD \033[0m"
+        echo $TOMCAT_PASSWORD >${GEOSERVER_DATA_DIR}/security/tomcat_pass.txt
+        if [[ ${SHOW_PASSWORD} =~ [Tt][Rr][Uu][Ee] ]];then
+          echo -e "[Entrypoint] GENERATED tomcat  PASSWORD: \e[1;31m $TOMCAT_PASSWORD \033[0m"
+        fi
     else
        export TOMCAT_PASSWORD=${TOMCAT_PASSWORD}
     fi
@@ -248,7 +258,7 @@ else
 
     if [[ "${ROOT_WEBAPP_REDIRECT}" =~ [Tt][Rr][Uu][Ee] ]]; then
         mkdir "${CATALINA_HOME}"/webapps/ROOT
-        cp /build_data/index.jsp "${CATALINA_HOME}"/webapps/ROOT/index.jsp
+        cat /build_data/index.jsp | sed "s@/geoserver/@/${GEOSERVER_CONTEXT_ROOT}/@g" > "${CATALINA_HOME}"/webapps/ROOT/index.jsp
     fi
 fi
 
@@ -431,6 +441,10 @@ if [[ -f ${EXTRA_CONFIG_DIR}/server.xml ]]; then
 else
   # default value
   eval "$transform"
+  # Add x-forwarded headers
+  if [[ "${ACTIVATE_PROXY_HEADERS}" =~ [Tt][Rr][Uu][Ee] ]]; then
+    sed -i.bak -r '/\<\Host\>/ i\ \t<Valve className="org.apache.catalina.valves.RemoteIpValve" remoteIpHeader="x-forwarded-for" remoteIpProxiesHeader="x-forwarded-by" protocolHeader="x-forwarded-proto" protocolHeaderHttpsValue="https"/>' ${CATALINA_HOME}/conf/server.xml
+  fi
 fi
 
 
