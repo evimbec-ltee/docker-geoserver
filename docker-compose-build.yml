@@ -2,6 +2,7 @@ version: '3.9'
 volumes:
    geoserver-data:
    settings:
+
 services:
    geoserver-prod:
       image: kartoza/geoserver-mod:${GS_VERSION}
@@ -40,11 +41,10 @@ services:
           DOWNLOAD_ALL_COMMUNITY_EXTENSIONS: ${DOWNLOAD_ALL_COMMUNITY_EXTENSIONS}
           STABLE_PLUGIN_BASE_URL: ${STABLE_PLUGIN_BASE_URL}
         target: geoserver-prod
-
-  geoserver-test:
-    image: kartoza/geoserver-mod:manual-build
-    build:
-      context: .
-      args:
-        <<: *build-args-anchor
-      target: geoserver-test
+   geoserver-test:
+      image: kartoza/geoserver:manual-build
+      build:
+        context: .
+        args:
+          <<: *build-args-anchor
+        target: geoserver-test
