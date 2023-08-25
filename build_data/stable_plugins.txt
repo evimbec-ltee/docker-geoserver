@@ -2,7 +2,6 @@ app-schema-plugin
 authkey-plugin
 cas-plugin
 charts-plugin
-control-flow-plugin
 css-plugin
 csw-iso-plugin
 csw-plugin
