@@ -157,6 +157,20 @@ if [[ -f ${GEOSERVER_HOME}/start.jar ]]; then
   fi
 fi
 
+# Install javamelody
+if [[ -f ${GEOSERVER_HOME}/start.jar ]]; then
+  if [[ ! -f ${GEOSERVER_HOME}/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/javamelody-core.jar ]]; then
+    validate_url https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-util/11.0.9/jetty-util-11.0.9.jar \
+      "-O ${GEOSERVER_HOME}/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/javamelody-core.jar"
+  fi
+fi
+if [[ -f ${GEOSERVER_HOME}/start.jar ]]; then
+  if [[ ! -f ${GEOSERVER_HOME}/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/jrobin.jar ]]; then
+    validate_url https://repo1.maven.org/maven2/org/jrobin/jrobin/1.5.9/jrobin-1.5.9.jar \
+      "-O ${GEOSERVER_HOME}/webapps/${GEOSERVER_CONTEXT_ROOT}/WEB-INF/lib/jrobin.jar"
+  fi
+fi
+
 # Overlay files and directories in resources/overlays if they exist
 rm -f /tmp/resources/overlays/README.txt &&
   if ls /tmp/resources/overlays/* >/dev/null 2>&1; then
