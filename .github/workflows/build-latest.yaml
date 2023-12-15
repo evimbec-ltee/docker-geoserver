@@ -1,19 +1,5 @@
 name: build-latest
 on:
-#  workflow_dispatch:
-#    inputs:
-#      distro:
-#        description: Base image distro
-#        required: true
-#        default: debian
-#      imageVersion:
-#        description: Base distro image version/release
-#        required: true
-#        default: bullseye
-#      imageVariant:
-#        description: Base image variant
-#        required: true
-#        default: slim
   workflow_dispatch:
   pull_request:
     branches:
@@ -22,7 +8,35 @@ on:
     branches:
       - develop
 jobs:
-  run-scenario-tests:
+  build-activemq-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image for testing activeqm
+        id: docker_build_testing_image_activeqm
+        uses: docker/build-push-action@v5
+        with:
+          context: ./clustering/activemq-docker/
+          file: ./clustering/activemq-docker/Dockerfile
+          push: false
+          load: true
+          tags: kartoza/activemq-docker:manual-build
+          outputs: type=docker,dest=/tmp/activemq.tar
+          cache-from: |
+            type=gha,scope=test
+            type=gha,scope=prod
+          cache-to: type=gha,scope=test
+          target: activemq-prod
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: kartoza-activemq
+          path: /tmp/activemq.tar
+  build-docker-image:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -32,9 +46,7 @@ jobs:
           - image: 9.0.73-jdk11-temurin-focal
             javaHome: /opt/java/openjdk
         geoserverMinorVersion:
-          - minor: 22
-            patch: 4
-          - minor: 23
+          - minor: 24
             patch: 1
         downloadAllStableExtensions:
           - 1
@@ -42,27 +54,22 @@ jobs:
           - 1
         stablePluginBaseURL:
           - https://sourceforge.net/projects/geoserver/files/GeoServer
-        scenario:
-          - gwc
-          - login
-          - stores
-          - context
-          - disk-quota
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Build image for testing
         id: docker_build_testing_image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
           push: false
           load: true
           tags: kartoza/geoserver:manual-build
+          outputs: type=docker,dest=/tmp/geoserver.tar
           build-args: |
             IMAGE_VERSION=${{ matrix.imageVersion.image }}
             JAVA_HOME=${{ matrix.imageVersion.javaHome }}
@@ -76,20 +83,57 @@ jobs:
            type=gha,scope=prod
           cache-to: type=gha,scope=test
           target: geoserver-test
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: kartoza-geoserver
+          path: /tmp/geoserver.tar
 
-
+  run-scenario-tests:
+    runs-on: ubuntu-latest
+    needs: [ build-docker-image, build-activemq-docker-image]
+    strategy:
+      matrix:
+        scenario:
+          - gwc
+          - login
+          - stores
+          - context
+          - disk-quota
+          - clustering
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: kartoza-geoserver
+          path: /tmp
+      - name: Load image
+        run: |
+          docker load --input /tmp/geoserver.tar
+      - name: Download ActiveMQ artifact
+        if: matrix.scenario == 'clustering'
+        uses: actions/download-artifact@v3
+        with:
+          name: kartoza-activemq
+          path: /tmp
+      - name: Load ActiveMQ image
+        if: matrix.scenario == 'clustering'
+        run: |
+          docker load --input /tmp/activemq.tar
       - name: Run scenario test ${{ matrix.scenario }}
         working-directory: scenario_tests/${{ matrix.scenario }}
         env:
           COMPOSE_INTERACTIVE_NO_CLI: 1
           PRINT_TEST_LOGS: 1
         run: |
+          # Use the built Docker image to run scenario tests
           bash ./test.sh
 
   push-internal-pr-images:
     if: github.event_name == 'pull_request' && github.event.pull_request.base.repo.url == github.event.pull_request.head.repo.url
     runs-on: ubuntu-latest
-    needs: [ run-scenario-tests ]
+    needs: [run-scenario-tests]
     strategy:
       matrix:
         geoserverMajorVersion:
@@ -98,9 +142,7 @@ jobs:
           - image: 9.0.73-jdk11-temurin-focal
             javaHome: /opt/java/openjdk
         geoserverMinorVersion:
-          - minor: 22
-            patch: 4
-          - minor: 23
+          - minor: 24
             patch: 1
         downloadAllStableExtensions:
           - 1
@@ -113,35 +155,34 @@ jobs:
           # to make it easy to pass overrides in the future.
           - https://sourceforge.net/projects/geoserver/files/GeoServer
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
       - name: Docker meta
         id: docker_meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKERHUB_REPO}}/geoserver
           tags: |
             type=semver,pattern=\d.\d.\d
             type=ref,event=branch
-            type=ref,event=pr
 
       - name: Build image for testing
         id: docker_build_testing_image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
-          push: true
+          push: false
           tags: |
-            ${{ steps.docker_meta.outputs.tags }}-${{ matrix.geoserverMajorVersion }}.${{ matrix.geoserverMinorVersion.minor }}.${{ matrix.geoserverMinorVersion.patch }}
+            kartoza/geoserver:manual-build
           build-args: |
             IMAGE_VERSION=${{ matrix.imageVersion.image }}
             JAVA_HOME=${{ matrix.imageVersion.javaHome }}

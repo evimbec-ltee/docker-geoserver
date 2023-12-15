@@ -4,8 +4,8 @@ version: '3.9'
 volumes:
   geoserver-data-dir:
 
-
 services:
+
   geoserver:
     image: 'kartoza/geoserver:${TAG:-manual-build}'
     restart: 'always'
@@ -15,16 +15,13 @@ services:
     environment:
       GEOSERVER_ADMIN_PASSWORD: myawesomegeoserver
       GEOSERVER_ADMIN_USER: admin
-      INITIAL_MEMORY: 2G
-      MAXIMUM_MEMORY: 4G
-      GEOSERVER_CONTEXT_ROOT: foobar
-      CONTAINER_NAME: geoserver
-      TEST_CLASS: test_login.TestGeoServerREST
+      TEST_CLASS: test_gdal.TestGeoServerGDAL
+    ports:
+      - "8080"
     healthcheck:
-      test: "curl --fail --silent --write-out 'HTTP CODE : %{http_code}\n' --output /dev/null -u admin:'myawesomegeoserver' http://localhost:8080/foobar/rest/about/version.xml"
+      test: "curl --fail --silent --write-out 'HTTP CODE : %{http_code}\n' --output /dev/null -u admin:'myawesomegeoserver' http://localhost:8080/geoserver/rest/about/version.xml"
       interval: 1m30s
       timeout: 10s
       retries: 3
-
 
 
