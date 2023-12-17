@@ -1,5 +1,6 @@
 #!/bin/bash
 
+echo "Entering start.sh"
 source /scripts/functions.sh
 source /scripts/env-data.sh
 GS_VERSION=$(cat /scripts/geoserver_version.txt)
@@ -150,6 +151,7 @@ fi
 set_vars
 export  READONLY CLUSTER_DURABILITY BROKER_URL EMBEDDED_BROKER TOGGLE_MASTER TOGGLE_SLAVE BROKER_URL
 export CLUSTER_CONFIG_DIR MONITOR_AUDIT_PATH INSTANCE_STRING
+echo "CLUSTER_CONFIG_DIR=${CLUSTER_CONFIG_DIR}"
 # Cleanup existing monitoring files
 if [[ ${CLUSTERING} =~ [Ff][Aa][Ll][Ss][Ee] ]]; then
   if [[ -d "${GEOSERVER_DATA_DIR}"/monitoring ]];then
