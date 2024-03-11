@@ -48,3 +48,5 @@ prod_build_geoserver: build_geoserver_image
 nonprod_build_activemq: build_activemq_image
 
 prod_build_activemq: build_activemq_image
+
+nonprod_aws_ecr_login: aws_ecr_login
